@@ -316,20 +316,37 @@ class ClipTestTimeTuning(nn.Module):
         text_features = self.get_text_features()
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         
-        #[c-tpt] --------------------------------------------
-        if self.l2_norm_cal:
-            prompt_mean = text_features.mean(0)
-            feature_distance = text_features - prompt_mean
-            l2_norm = torch.linalg.norm(feature_distance, dim=-1)
-            l2_norm_mean = l2_norm.mean()
-            
-            #for saving to csv file
-            self.l2_norm_mean = l2_norm_mean.item()
-            
-            #for training
-            self.l2_norm_mean_training = l2_norm_mean
         
-        #-----------------------------------------------------
+        #[L-tpt] --------------------------------------------
+        if self.ang_norm_cal:
+            tau_ = 0.99999  
+                      
+            #W_ = F.normalize(text_features, p=2, dim=1)
+
+            #Wwt = torch.matmul(W_, W_.t())
+            #Wwt = Wwt - 2. * torch.diag(torch.diag(Wwt))
+            #ang_norm_mean = -torch.acos(Wwt.max(dim=1)[0].clamp(-tau_, tau_)).mean()
+            # print("ang_norm_mean:", ang_norm_mean)
+
+            ####llloyds-------
+            X = text_features
+            d=X.size(-1)
+            n_samples=1000
+            device = X.device
+                    
+            
+            samples = F.normalize(torch.randn(n_samples, 1, d, device=device), dim=-1) 
+            dist2 = torch.acos((samples @ X.T).clamp(-1+1e-7, 1-1e-7)) ** 2
+            ang_norm_mean = (torch.min(dist2, dim=-1)[0]).mean()
+            
+
+            #for saving to csv file
+            self.ang_norm_mean = ang_norm_mean.item()
+
+            #for training
+            self.ang_norm_mean_training = ang_norm_mean
+            
+        #--------lloyds
 
         logit_scale = self.logit_scale.exp()
         logits = logit_scale * image_features @ text_features.t()
