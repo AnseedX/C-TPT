@@ -321,12 +321,7 @@ class ClipTestTimeTuning(nn.Module):
         if self.ang_norm_cal:
             tau_ = 0.99999  
                       
-            #W_ = F.normalize(text_features, p=2, dim=1)
 
-            #Wwt = torch.matmul(W_, W_.t())
-            #Wwt = Wwt - 2. * torch.diag(torch.diag(Wwt))
-            #ang_norm_mean = -torch.acos(Wwt.max(dim=1)[0].clamp(-tau_, tau_)).mean()
-            # print("ang_norm_mean:", ang_norm_mean)
 
             ####llloyds-------
             X = text_features
