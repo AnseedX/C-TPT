@@ -317,22 +317,18 @@ class ClipTestTimeTuning(nn.Module):
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         
         
-        #[L-tpt] --------------------------------------------
+        #[A-tpt] --------------------------------------------
         if self.ang_norm_cal:
             tau_ = 0.99999  
                       
 
 
-            ####llloyds-------
-            X = text_features
-            d=X.size(-1)
-            n_samples=1000
-            device = X.device
-                    
-            
-            samples = F.normalize(torch.randn(n_samples, 1, d, device=device), dim=-1) 
-            dist2 = torch.acos((samples @ X.T).clamp(-1+1e-7, 1-1e-7)) ** 2
-            ang_norm_mean = (torch.min(dist2, dim=-1)[0]).mean()
+            ####-------
+            W_ = F.normalize(text_features, p=2, dim=1)
+
+            Wwt = torch.matmul(W_, W_.t())
+            Wwt = Wwt - 2. * torch.diag(torch.diag(Wwt))
+            ang_norm_mean = -torch.acos(Wwt.max(dim=1)[0].clamp(-tau_, tau_)).mean()
             
 
             #for saving to csv file
