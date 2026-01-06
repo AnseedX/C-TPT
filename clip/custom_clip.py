@@ -337,7 +337,7 @@ class ClipTestTimeTuning(nn.Module):
             #for training
             self.ang_norm_mean_training = ang_norm_mean
             
-        #--------lloyds
+   
 
         logit_scale = self.logit_scale.exp()
         logits = logit_scale * image_features @ text_features.t()
