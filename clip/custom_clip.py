@@ -316,28 +316,47 @@ class ClipTestTimeTuning(nn.Module):
         text_features = self.get_text_features()
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         
-        
-        #[A-tpt] --------------------------------------------
-        if self.ang_norm_cal:
-            tau_ = 0.99999  
-                      
-
-
-            ####-------
-            W_ = F.normalize(text_features, p=2, dim=1)
-
-            Wwt = torch.matmul(W_, W_.t())
-            Wwt = Wwt - 2. * torch.diag(torch.diag(Wwt))
-            ang_norm_mean = -torch.acos(Wwt.max(dim=1)[0].clamp(-tau_, tau_)).mean()
+        # [L-TPT] Corrected Implementation ----------------------------------
+        # We check 'ang_norm_cal' because that is what your main script sets.
+        if getattr(self, 'ang_norm_cal', False): 
             
+            # 1. Initialize Fixed Probes ONCE (Lazy Initialization)
+            if self.fixed_probes is None:
+                N_classes, D = text_features.shape
+                # Use a fixed number of probes (e.g., 1000) or match class count
+                M_probes = 1000 
+                
+                device = text_features.device
+                
+                # Generate standard Gaussian vectors and normalize them to the unit sphere
+                # Shape: [M, D]
+                self.fixed_probes = F.normalize(torch.randn(M_probes, D, device=device), dim=-1)
 
-            #for saving to csv file
+            # 2. Calculate Similarity Matrix (Text @ Probes.T)
+            # text_features: [N, D]
+            # fixed_probes:  [M, D]
+            # sim matrix:    [N, M] (Rows are text classes, Cols are probes)
+            sim = text_features @ self.fixed_probes.T
+            
+            # 3. Calculate Squared Angular Distance
+            # Clamp for numerical stability (acos domain is [-1, 1])
+            eps = 1e-7
+            dist_sq = torch.acos(sim.clamp(-1 + eps, 1 - eps)) ** 2
+            
+            # 4. Minimize over Probes (dim=1)
+            # "For each text class (row), find the closest probe (column)"
+            # This ensures every text class is optimized towards its own anchor.
+            min_dist_values, _ = torch.min(dist_sq, dim=1)
+            
+            # 5. Calculate Mean Loss
+            ang_norm_mean = min_dist_values.mean()
+            
+            # Save for logging and training
+            # IMPORTANT: Naming must match what 'atpt_classification.py' expects!
             self.ang_norm_mean = ang_norm_mean.item()
-
-            #for training
             self.ang_norm_mean_training = ang_norm_mean
-            
-   
+        
+        # -----------------------------------------------------
 
         logit_scale = self.logit_scale.exp()
         logits = logit_scale * image_features @ text_features.t()
